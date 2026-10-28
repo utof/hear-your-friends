@@ -1,21 +1,28 @@
 # Hear Your Friends
 
-Research toward a client-side voice-volume boost for Abiotic Factor. **This is not yet a working mod.** There is no slider, installable package, or verified way to boost a friend's voice here yet.
+An **experimental, unverified** PC UE4SS mod for Abiotic Factor that attempts to boost incoming voice chat. It has not yet been tested in the game or against a second player. It is not an official mod.io mod, and it currently uses a numeric field rather than a slider.
 
-## What we know
+## Try the prototype
 
-- [Deep Field's modding FAQ](https://steamcommunity.com/app/427410/discussions/0/572675720491522460/) lists supported content, and says new gameplay settings and keybindings are not supported by the initial official tools. It also says unofficial mods are allowed. The FAQ predates release, so this is not proof of every current editor capability.
-- The free [official Mod Editor](https://store.epicgames.com/p/abiotic-factor-mod-editor-3b7438) is a Windows application, and official mods use mod.io. [The developer's installation guide](https://steamcommunity.com/app/427410/announcements/) explains the in-game mod browser. An unofficial UE4SS mod would be separately installed on PC and would not be an official mod.io package.
-- The installed Steam game (build `26232136`) includes debug symbols for `UniversalVoiceChatPro`. Those symbols expose `PlayerVoiceChatActor`, `MicrophoneSpeakComponent`, and `SetVoiceVolume(float)`. Unreal-generated property symbols also name `PlayerVoiceChatActor.microphoneSpeakComponent`, `PlayerVoiceChatActor.voiceVolume`, and `MicrophoneSpeakComponent.VoiceCaptureAudioComponent`. Native class debug information names `VoiceVolume`, `RadioVoiceVolumeMultiplier`, and local mute/radio flags, but does not establish that all of those are exposed through Unreal reflection.
-- Debug information shows that `SetVoiceVolume` calls `SetVolumeMultiplier` through `UpdateVoiceVolume`, and that the replicated voice-volume notification also reaches that path. This is evidence of a possible playback control, not proof that applying gain on a client is correct, that gain above 1 works in game, or that radio and mute behave correctly.
-- [UE4SS Lua API](https://docs.ue4ss.com/lua-api.html) documents reflected object discovery and function hooks. [UE4SS GUI tabs](https://docs.ue4ss.com/guides/creating-gui-tabs-with-c++-mod.html) documents a C++ ImGui tab, not a built-in game settings slider. Availability and compatibility with this game build still need testing.
-- [Community modding guide](https://hackmd.io/@Swept/abioticfactormodding) describes older unofficial workflows; its versions and mappings may be out of date after Community Update #5.
+1. Install a UE4SS build compatible with your Abiotic Factor version. The community's [Abiotic Factor UE4SS configuration](https://github.com/igromanru/AF-UE4SS) and [Nexus page](https://www.nexusmods.com/abioticfactor/mods/35) are starting points, but compatibility with Community Update #5 has **not** been verified. The game developers warn that many older unofficial mods may break after that update.
+2. With the game closed, copy `Mods/HearYourFriends` from this repository into your UE4SS `Mods` folder. The folder needs `Scripts/main.lua` and `enabled.txt`.
+3. Copy `Mods/shared/ModMenu` into your UE4SS `Mods/shared` folder. **If a ModMenu is already installed**, do not overwrite it blindly; this prototype was written against the version recorded below, and compatibility with other versions is unknown. UE4SS's `shared/UEHelpers` must also be present.
+4. Start the game, join a friend, and press **F8**. Enter a multiplier in **Voice multiplier**: `1` means normal, `2` means a proposed twofold multiplier, and the maximum is `4`. The value resets to `1` when the mod reloads. It applies to all incoming voices, not separately to each friend.
+5. Compare normal and boosted speech, then check mute, proximity, radio, and reconnecting. Stop testing if the behavior is wrong. To remove this prototype, close the game and remove `Mods/HearYourFriends`; leave any shared dependency in place if another mod uses it.
 
-## Next steps
+Depending on the UE4SS build, `Mods` may be under `AbioticFactor/Binaries/Win64/ue4ss/Mods` or `AbioticFactor/Binaries/Win64/Mods`. Under Proton, an appropriate DLL override may be needed; follow the instructions for the actual loader build.
 
-1. Inspect the current official editor and verify whether it exposes the voice system or any settings UI extension point.
-2. With a compatible UE4SS installation, inspect live remote-player voice actors and establish which audio component carries incoming voice. Check the local player separately and do not alter the sender's microphone.
-3. In a two-player session, test voice at gain 1 and greater than 1, while checking distance attenuation, radio effects, mute, player reconnects and replicated volume updates. Ensure repeated updates do not compound gain.
-4. Only after that, implement a persistent client-side slider using a verified UI route, and package and test installation.
+The prototype starts at 1 and makes no voice-volume changes until a higher value is selected. It attempts to skip the local player, players muted locally, and actors whose player identity cannot be established. It periodically reapplies the multiplier to the actor's original replicated volume rather than repeatedly multiplying the last output. **These behaviors are only tested with mocked objects**, not in Abiotic Factor. If the game cannot expose the expected voice API or player identity, the mod will skip updates. Check the UE4SS log for `[HearYourFriends]` errors.
 
-No game files or loader binaries are included in this repository.
+## Existing capabilities and evidence
+
+- [Deep Field's modding FAQ](https://steamcommunity.com/app/427410/discussions/0/572675720491522460/) lists content mods, says its initial official tools cannot add new gameplay settings or keybindings, and permits unofficial mods. It predates release, so it does not establish every current editor capability. The [official Mod Editor](https://store.epicgames.com/p/abiotic-factor-mod-editor-3b7438) is a free Windows application.
+- The installed Steam game (build `26232136`) includes debug symbols for `UniversalVoiceChatPro`. Unreal-generated symbols identify `PlayerVoiceChatActor.microphoneSpeakComponent`, `PlayerVoiceChatActor.voiceVolume`, `MicrophoneSpeakComponent.VoiceCaptureAudioComponent`, and the mute and local-player functions used by the prototype. Native symbols show `SetVoiceVolume(float)` ultimately calls `SetVolumeMultiplier`; replicated volume updates also reach this path. Symbol information does not prove that it boosts incoming voice correctly or respects every in-game audio state.
+- [UE4SS Lua API](https://docs.ue4ss.com/lua-api.html) provides reflected-object access and game-thread execution. [ModMenu](https://github.com/mattdavida/ue4ss-ModMenu), revision `aff9716695f5432441cb329a9615721cc26a0d57`, provides a ready-made numeric settings field, but does not currently provide a slider. The included generated bundle is MIT licensed; its license is alongside it. The bundle was built using the upstream `node tools/bundle.mjs` command. It and UE4SS have not been verified against this particular game update.
+- [Community modding guide](https://hackmd.io/@Swept/abioticfactormodding) describes older unofficial workflows; its versions and mappings may be outdated after Community Update #5.
+
+## Development
+
+Run `lua tests/voice_spec.lua` from the repository root with Lua 5.4. The tests use mocked UE4SS/game objects and check remote-player selection, mute handling, gain calculation, and returning to the baseline. They cannot establish actual game, sound, loader or menu compatibility.
+
+No game files or loader binaries are included.
