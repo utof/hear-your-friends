@@ -1,7 +1,17 @@
 local menu, tick, status_text
 Key = { F8 = 119 }
+package.preload['menu_reload'] = function() return { prepare = function() end } end
+package.preload['config'] = function() return { gain = 1, soloTest = false, diagnostics = false } end
+package.preload['playback'] = function()
+    return { managed = function() return false end, apply = function(mic, baseline, gain)
+        if gain == 1 and not mic.was_changed then return end
+        mic:SetVoiceVolume(baseline * gain)
+        mic.was_changed = gain ~= 1
+        return gain > 0 and 20*math.log(gain,10) or 0
+    end }
+end
 package.preload['ModMenu.ModMenu'] = function()
-    return { Init = function() end, Register = function(section) menu = section end, SetLabel = function(_, _, text) status_text = text end }
+    return { Init = function() end, GetInstanceId = function() return 'test' end, Register = function(section) menu = section end, SetLabel = function(_, _, text) status_text = text end }
 end
 LoopAsync = function(_, callback) tick = callback end
 ExecuteInGameThread = function(callback) callback() end
@@ -10,7 +20,7 @@ local function object(address)
 end
 local local_actor, remote, muted, no_owner = object(1), object(2), object(3), object(4)
 local function component()
-    return { IsValid = function() return true end, calls = {}, SetVoiceVolume = function(self, volume) table.insert(self.calls, volume) end }
+    return { IsValid = function() return true end, calls = {}, SetVoiceVolume = function(self, volume) table.insert(self.calls, volume); if self.VoiceCaptureAudioComponent then self.VoiceCaptureAudioComponent.VolumeMultiplier = volume end end }
 end
 remote.microphoneSpeakComponent, muted.microphoneSpeakComponent, no_owner.microphoneSpeakComponent = component(), component(), component()
 local_actor.microphoneSpeakComponent, local_actor.voiceVolume = component(), 0.3
@@ -20,7 +30,7 @@ remote.ownerPlayerState, muted.ownerPlayerState = object(12), object(13)
 local voice = object(20)
 function voice:VoiceChatGetMyLocalPlayerVoiceChat() return local_actor end
 function voice:VoiceChatGetMuteAllPlayers() return false end
-function voice:VoiceChatLocalIsMutedSomeone(player, context) assert(context == local_actor); return player:GetAddress() == 13 end
+function voice:VoiceChatLocalIsMutedSomeone(context, player) assert(context == local_actor); return player:GetAddress() == 13 end
 StaticFindObject = function() return voice end
 FindAllOf = function() return {local_actor, remote, muted, no_owner} end
 
@@ -89,6 +99,9 @@ solo(false)
 tick()
 assert(status_text == 'Solo test off', 'disabling normal-volume solo test updates status')
 solo(true)
+change(0.1)
+tick()
+assert(status_text and status_text:find('-20.00 dB', 1, true), 'reports source gain in decibels')
 voice.VoiceChatGetMyLocalPlayerVoiceChat = function() error('voice API failed') end
 tick()
 assert(status_text and status_text:find('voice API failed', 1, true), 'solo status exposes voice API errors')

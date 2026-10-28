@@ -10,3 +10,7 @@ DerivedDataCache/
 
 # Locally generated prototype archives
 artifacts/
+
+# Python developer tools
+__pycache__/
+*.pyc

@@ -1,9 +1,12 @@
 -- Experimental client-side UE4SS mod. See README before using.
 local ModMenu = require('ModMenu.ModMenu')
-local gain = 1
-local changed = {}
+local config = require('config')
+local Playback = require('playback')
+local MenuReload = require('menu_reload')
+local menuPrepared = false
+local gain = math.max(0, math.min(4, tonumber(config.gain) or 1))
 local warned = false
-local soloTest = false
+local soloTest = config.soloTest == true
 local localChanged = false
 local lastStatus
 
@@ -20,6 +23,10 @@ end
 
 local function update()
     local ok, failure = pcall(function()
+        if not menuPrepared then
+            MenuReload.prepare(ModMenu.GetInstanceId())
+            menuPrepared = true
+        end
         local api = StaticFindObject('/Script/UniversalVoiceChatPro.Default__UniversalVoiceChat')
         if not valid(api) then
             if soloTest then status('Waiting for voice system') end
@@ -33,12 +40,12 @@ local function update()
         -- Solo testing changes playback on the local voice component only. It never
         -- starts capture or transmits voice; the game controls microphone loopback.
         local localOK, localError = pcall(function()
-            if not soloTest and not localChanged then return end
             local mic, volume = localActor.microphoneSpeakComponent, localActor.voiceVolume
             if not valid(mic) then
                 if soloTest then status('Waiting for local microphone component') end
                 return
             end
+            if not soloTest and not localChanged and not Playback.managed(mic) then return end
             if type(volume) ~= 'number' or volume ~= volume or volume < 0 then
                 if soloTest then status('Local voice baseline unavailable') end
                 return
@@ -47,10 +54,13 @@ local function update()
                 if soloTest then status('Waiting for local playback component') end
                 return
             end
-            mic:SetVoiceVolume(volume * (soloTest and gain or 1))
+            local decibels = Playback.apply(mic, volume, soloTest and gain or 1)
+            if config.diagnostics then
+                print(string.format('[HearYourFriends.Measure] gain=%.6f base=%.6f effect_db=%.6f\n', gain, volume, decibels or 0))
+            end
             localChanged = soloTest and gain ~= 1
             if soloTest then
-                status(string.format('Applied %.2fx (base %.2f, target %.2f; audio unverified)', gain, volume, volume * gain))
+                status(string.format('Applied %.2fx%s', gain, gain == 0 and ' (muted)' or string.format(' (%+.2f dB)', decibels or 0)))
             else
                 status('Solo test off; local volume restored')
             end
@@ -65,17 +75,14 @@ local function update()
         for _, actor in pairs(actors) do
             local actorOK, actorError = pcall(function()
                 if not valid(actor) or actor:GetAddress() == localAddress then return end
-                local address = actor:GetAddress()
-                if gain == 1 and not changed[address] then return end
                 local player = actor.ownerPlayerState
                 if not valid(player) then return end
-                local muted = api:VoiceChatLocalIsMutedSomeone(player, localActor)
+                local muted = api:VoiceChatLocalIsMutedSomeone(localActor, player)
                 if type(muted) ~= 'boolean' or muted then return end
                 local mic = actor.microphoneSpeakComponent
                 local volume = actor.voiceVolume
                 if not valid(mic) or type(volume) ~= 'number' or volume ~= volume or volume < 0 then return end
-                mic:SetVoiceVolume(volume * gain)
-                changed[address] = gain ~= 1 or nil
+                Playback.apply(mic, volume, gain)
             end)
             if not actorOK and not warned then
                 warned = true
@@ -93,14 +100,14 @@ local function update()
     end
 end
 
-ModMenu.Init({ title = 'Hear Your Friends (experimental)', instanceId = 'HearYourFriends', key = Key.F8, keyHint = 'F8', ignoreLook = true })
+ModMenu.Init({ title = 'Hear Your Friends (experimental)', key = Key.F8, keyHint = 'F8', ignoreLook = true })
 ModMenu.Register({
     id = 'Voice', title = 'Incoming voice', items = {
-        { type = 'number', id = 'gain', label = 'Voice multiplier', default = 1, min = 0, max = 4, debounceMs = 0,
+        { type = 'number', id = 'gain', label = 'Voice multiplier', default = gain, min = 0, max = 4, debounceMs = 0,
           onChange = function(value)
               if type(value) == 'number' and value == value then gain = math.max(0, math.min(4, value)) end
           end },
-        { type = 'checkbox', id = 'solo', label = 'Test local microphone playback', default = false,
+        { type = 'checkbox', id = 'solo', label = 'Test local microphone playback', default = soloTest,
           onChange = function(value)
               soloTest = value == true
               if not soloTest and not localChanged then status('Solo test off') end
@@ -114,4 +121,4 @@ LoopAsync(500, function()
     ExecuteInGameThread(update)
     return false
 end)
-print('[HearYourFriends] Experimental controls: F8; multiplier starts at 1.\n')
+print(string.format('[HearYourFriends] Loaded: gain=%.3f solo=%s; F8 controls.\n', gain, tostring(soloTest)))
