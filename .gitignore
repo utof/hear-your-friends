@@ -1,0 +1,9 @@
+# Local game / editor / build output
+Saved/
+Intermediate/
+Binaries/
+DerivedDataCache/
+*.pdb
+*.pak
+*.ucas
+*.utoc
