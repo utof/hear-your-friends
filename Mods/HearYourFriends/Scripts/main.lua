@@ -5,6 +5,14 @@ local changed = {}
 local warned = false
 local soloTest = false
 local localChanged = false
+local lastStatus
+
+local function status(message)
+    if message == lastStatus then return end
+    lastStatus = message
+    pcall(function() ModMenu.SetLabel('Voice', 'status', message) end)
+    print('[HearYourFriends] ' .. message .. '\n')
+end
 
 local function valid(object)
     return object ~= nil and object:IsValid()
@@ -13,22 +21,42 @@ end
 local function update()
     local ok, failure = pcall(function()
         local api = StaticFindObject('/Script/UniversalVoiceChatPro.Default__UniversalVoiceChat')
-        if not valid(api) then return end
+        if not valid(api) then
+            if soloTest then status('Waiting for voice system') end
+            return
+        end
         local localActor = api:VoiceChatGetMyLocalPlayerVoiceChat()
-        if not valid(localActor) then return end
+        if not valid(localActor) then
+            if soloTest then status('Waiting for local voice actor') end
+            return
+        end
         -- Solo testing changes playback on the local voice component only. It never
         -- starts capture or transmits voice; the game controls microphone loopback.
         local localOK, localError = pcall(function()
             if not soloTest and not localChanged then return end
-            if soloTest and gain == 1 and not localChanged then return end
             local mic, volume = localActor.microphoneSpeakComponent, localActor.voiceVolume
-            if not valid(mic) or type(volume) ~= 'number' or volume ~= volume or volume < 0 then return end
+            if not valid(mic) then
+                if soloTest then status('Waiting for local microphone component') end
+                return
+            end
+            if type(volume) ~= 'number' or volume ~= volume or volume < 0 then
+                if soloTest then status('Local voice baseline unavailable') end
+                return
+            end
+            if not valid(mic.VoiceCaptureAudioComponent) then
+                if soloTest then status('Waiting for local playback component') end
+                return
+            end
             mic:SetVoiceVolume(volume * (soloTest and gain or 1))
             localChanged = soloTest and gain ~= 1
+            if soloTest then
+                status(string.format('Applied %.2fx (base %.2f, target %.2f; audio unverified)', gain, volume, volume * gain))
+            else
+                status('Solo test off; local volume restored')
+            end
         end)
-        if not localOK and not warned then
-            warned = true
-            print('[HearYourFriends] Solo playback unavailable: ' .. tostring(localError) .. '\n')
+        if not localOK then
+            status('Solo playback unavailable: ' .. tostring(localError))
         end
         local allMuted = api:VoiceChatGetMuteAllPlayers()
         if type(allMuted) ~= 'boolean' or allMuted then return end
@@ -55,23 +83,31 @@ local function update()
             end
         end
     end)
-    if not ok and not warned then
-        warned = true
-        print('[HearYourFriends] Voice update unavailable: ' .. tostring(failure) .. '\n')
+    if not ok then
+        if soloTest then
+            status('Voice update unavailable: ' .. tostring(failure))
+        elseif not warned then
+            warned = true
+            print('[HearYourFriends] Voice update unavailable: ' .. tostring(failure) .. '\n')
+        end
     end
 end
 
 ModMenu.Init({ title = 'Hear Your Friends (experimental)', instanceId = 'HearYourFriends', key = Key.F8, keyHint = 'F8', ignoreLook = true })
 ModMenu.Register({
     id = 'Voice', title = 'Incoming voice', items = {
-        { type = 'number', id = 'gain', label = 'Voice multiplier', default = 1, min = 1, max = 4,
+        { type = 'number', id = 'gain', label = 'Voice multiplier', default = 1, min = 0, max = 4, debounceMs = 0,
           onChange = function(value)
-              if type(value) == 'number' and value == value then gain = math.max(1, math.min(4, value)) end
+              if type(value) == 'number' and value == value then gain = math.max(0, math.min(4, value)) end
           end },
         { type = 'checkbox', id = 'solo', label = 'Test local microphone playback', default = false,
-          onChange = function(value) soloTest = value == true end },
+          onChange = function(value)
+              soloTest = value == true
+              if not soloTest and not localChanged then status('Solo test off') end
+          end },
+        { type = 'label', id = 'status', label = 'Solo test off' },
         { type = 'label', label = 'Solo test needs the game microphone test; use headphones.' },
-        { type = 'label', label = '1 = normal; values above 1 are experimental.' },
+        { type = 'label', label = '0 = silent; 1 = normal; above 1 boosts.' },
     }
 })
 LoopAsync(500, function()

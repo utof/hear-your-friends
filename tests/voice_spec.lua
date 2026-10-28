@@ -1,7 +1,7 @@
-local menu, tick
+local menu, tick, status_text
 Key = { F8 = 119 }
 package.preload['ModMenu.ModMenu'] = function()
-    return { Init = function() end, Register = function(section) menu = section end }
+    return { Init = function() end, Register = function(section) menu = section end, SetLabel = function(_, _, text) status_text = text end }
 end
 LoopAsync = function(_, callback) tick = callback end
 ExecuteInGameThread = function(callback) callback() end
@@ -14,6 +14,7 @@ local function component()
 end
 remote.microphoneSpeakComponent, muted.microphoneSpeakComponent, no_owner.microphoneSpeakComponent = component(), component(), component()
 local_actor.microphoneSpeakComponent, local_actor.voiceVolume = component(), 0.3
+local_actor.microphoneSpeakComponent.VoiceCaptureAudioComponent = object(101)
 remote.voiceVolume, muted.voiceVolume, no_owner.voiceVolume = 0.4, 0.8, 0.5
 remote.ownerPlayerState, muted.ownerPlayerState = object(12), object(13)
 local voice = object(20)
@@ -28,6 +29,8 @@ dofile('Mods/HearYourFriends/Scripts/main.lua')
 assert(menu and tick, 'registers UI and timer')
 tick()
 assert(#local_actor.microphoneSpeakComponent.calls == 0, 'solo mode starts disabled')
+assert(menu.items[1].min == 0, 'volume control allows zero')
+assert(menu.items[1].debounceMs == 0, 'volume change is not delayed after editing')
 local change = menu.items[1].onChange
 change(2)
 tick(); tick()
@@ -61,4 +64,32 @@ tick()
 assert(local_actor.microphoneSpeakComponent.calls[2] == 0.3, 'disabling solo test restores local volume')
 tick()
 assert(#local_actor.microphoneSpeakComponent.calls == 2, 'local voice is untouched after test')
+change(0)
+solo(true)
+tick()
+assert(local_actor.microphoneSpeakComponent.calls[3] == 0, 'zero silences the local playback component')
+assert(status_text and status_text:find('Applied'), 'solo test reports an applied value')
+localActorSaved = voice.VoiceChatGetMyLocalPlayerVoiceChat
+voice.VoiceChatGetMyLocalPlayerVoiceChat = function() return nil end
+tick()
+assert(status_text and status_text:find('local voice actor'), 'solo test reports missing local actor')
+voice.VoiceChatGetMyLocalPlayerVoiceChat = localActorSaved
+local_actor.microphoneSpeakComponent.VoiceCaptureAudioComponent = nil
+tick()
+assert(status_text and status_text:find('playback component'), 'solo test reports missing playback component')
+local_actor.microphoneSpeakComponent.VoiceCaptureAudioComponent = object(101)
+solo(false)
+tick()
+assert(local_actor.microphoneSpeakComponent.calls[4] == 0.3, 'disabling solo test restores from zero')
+change(1)
+solo(true)
+tick()
+assert(status_text and status_text:find('Applied 1.00x', 1, true), 'solo status reports the normal multiplier')
+solo(false)
+tick()
+assert(status_text == 'Solo test off', 'disabling normal-volume solo test updates status')
+solo(true)
+voice.VoiceChatGetMyLocalPlayerVoiceChat = function() error('voice API failed') end
+tick()
+assert(status_text and status_text:find('voice API failed', 1, true), 'solo status exposes voice API errors')
 print('voice control tests passed')
