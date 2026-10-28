@@ -7,3 +7,6 @@ DerivedDataCache/
 *.pak
 *.ucas
 *.utoc
+
+# Locally generated prototype archives
+artifacts/

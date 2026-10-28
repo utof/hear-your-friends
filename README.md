@@ -12,6 +12,12 @@ An **experimental, unverified** PC UE4SS mod for Abiotic Factor that attempts to
 
 Depending on the UE4SS build, `Mods` may be under `AbioticFactor/Binaries/Win64/ue4ss/Mods` or `AbioticFactor/Binaries/Win64/Mods`. Under Proton, an appropriate DLL override may be needed; follow the instructions for the actual loader build.
 
+## Test alone with microphone playback
+
+The F8 menu has an experimental **Test local microphone playback** checkbox. With headphones on, load a solo world, enable the game’s microphone listening/test option in its audio settings, and verify that you can hear your own microphone before continuing. Turn on the checkbox and compare the sound at 1× and 2×. Turn the checkbox off to restore the local playback volume. The checkbox is off on startup; the mod does not start microphone capture or transmit your voice. The microphone test and whether it uses the same local audio component are **not yet verified** with this game build; if your voice is not audible or the multiplier has no effect, this test is inconclusive.
+
+This tests local playback, not a simulated network client. It cannot establish that other players’ voices, radio effects, attenuation, reconnects, or replication work correctly; those still require a multiplayer test. Automated mocked tests simulate remote-player objects and exercise the gain and mute logic without a second player.
+
 The prototype starts at 1 and makes no voice-volume changes until a higher value is selected. It attempts to skip the local player, players muted locally, and actors whose player identity cannot be established. It periodically reapplies the multiplier to the actor's original replicated volume rather than repeatedly multiplying the last output. **These behaviors are only tested with mocked objects**, not in Abiotic Factor. If the game cannot expose the expected voice API or player identity, the mod will skip updates. Check the UE4SS log for `[HearYourFriends]` errors.
 
 ## Existing capabilities and evidence
@@ -23,6 +29,12 @@ The prototype starts at 1 and makes no voice-volume changes until a higher value
 
 ## Development
 
-Run `lua tests/voice_spec.lua` from the repository root with Lua 5.4. The tests use mocked UE4SS/game objects and check remote-player selection, mute handling, gain calculation, and returning to the baseline. They cannot establish actual game, sound, loader or menu compatibility.
+Run `lua tests/voice_spec.lua` from the repository root with Lua 5.4. The tests use mocked UE4SS/game objects and check remote-player selection, mute handling, gain calculation, solo-test behavior, and returning to the baseline. They cannot establish actual game, sound, loader or menu compatibility.
 
 No game files or loader binaries are included.
+
+## Publishing
+
+The source is public on [GitHub](https://github.com/utof/hear-your-friends). For a PC UE4SS release, create an archive containing `Mods/HearYourFriends` and the bundled `Mods/shared/ModMenu` (including its MIT license), clearly state the UE4SS requirement and game compatibility, then create a draft on [Nexus Mods](https://www.nexusmods.com/games/abioticfactor). Nexus requires functional files and accurate descriptions; consult its [submission guidelines](https://help.nexusmods.com/article/28-file-submission-guidelines) before publishing. Complete real playback and multiplayer tests first.
+
+This UE4SS Lua prototype is not an official Mod Editor package and is not automatically distributed through Abiotic Factor’s mod.io browser. Official mod.io distribution would require a separately validated implementation using the official mod tooling.

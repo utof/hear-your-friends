@@ -3,6 +3,8 @@ local ModMenu = require('ModMenu.ModMenu')
 local gain = 1
 local changed = {}
 local warned = false
+local soloTest = false
+local localChanged = false
 
 local function valid(object)
     return object ~= nil and object:IsValid()
@@ -14,6 +16,20 @@ local function update()
         if not valid(api) then return end
         local localActor = api:VoiceChatGetMyLocalPlayerVoiceChat()
         if not valid(localActor) then return end
+        -- Solo testing changes playback on the local voice component only. It never
+        -- starts capture or transmits voice; the game controls microphone loopback.
+        local localOK, localError = pcall(function()
+            if not soloTest and not localChanged then return end
+            if soloTest and gain == 1 and not localChanged then return end
+            local mic, volume = localActor.microphoneSpeakComponent, localActor.voiceVolume
+            if not valid(mic) or type(volume) ~= 'number' or volume ~= volume or volume < 0 then return end
+            mic:SetVoiceVolume(volume * (soloTest and gain or 1))
+            localChanged = soloTest and gain ~= 1
+        end)
+        if not localOK and not warned then
+            warned = true
+            print('[HearYourFriends] Solo playback unavailable: ' .. tostring(localError) .. '\n')
+        end
         local allMuted = api:VoiceChatGetMuteAllPlayers()
         if type(allMuted) ~= 'boolean' or allMuted then return end
         local localAddress = localActor:GetAddress()
@@ -52,6 +68,9 @@ ModMenu.Register({
           onChange = function(value)
               if type(value) == 'number' and value == value then gain = math.max(1, math.min(4, value)) end
           end },
+        { type = 'checkbox', id = 'solo', label = 'Test local microphone playback', default = false,
+          onChange = function(value) soloTest = value == true end },
+        { type = 'label', label = 'Solo test needs the game microphone test; use headphones.' },
         { type = 'label', label = '1 = normal; values above 1 are experimental.' },
     }
 })

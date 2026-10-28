@@ -13,6 +13,7 @@ local function component()
     return { IsValid = function() return true end, calls = {}, SetVoiceVolume = function(self, volume) table.insert(self.calls, volume) end }
 end
 remote.microphoneSpeakComponent, muted.microphoneSpeakComponent, no_owner.microphoneSpeakComponent = component(), component(), component()
+local_actor.microphoneSpeakComponent, local_actor.voiceVolume = component(), 0.3
 remote.voiceVolume, muted.voiceVolume, no_owner.voiceVolume = 0.4, 0.8, 0.5
 remote.ownerPlayerState, muted.ownerPlayerState = object(12), object(13)
 local voice = object(20)
@@ -25,6 +26,8 @@ FindAllOf = function() return {local_actor, remote, muted, no_owner} end
 assert(loadfile('Mods/shared/ModMenu/ModMenu.lua'))
 dofile('Mods/HearYourFriends/Scripts/main.lua')
 assert(menu and tick, 'registers UI and timer')
+tick()
+assert(#local_actor.microphoneSpeakComponent.calls == 0, 'solo mode starts disabled')
 local change = menu.items[1].onChange
 change(2)
 tick(); tick()
@@ -48,4 +51,14 @@ remote.voiceVolume = 0.2
 change(100)
 tick()
 assert(remote.microphoneSpeakComponent.calls[4] == 0.8, 'uses current baseline and clamps gain')
+local solo = assert(menu.items[2].onChange, 'solo test toggle exists')
+change(2)
+solo(true)
+tick()
+assert(local_actor.microphoneSpeakComponent.calls[1] == 0.6, 'solo test uses local voice component')
+solo(false)
+tick()
+assert(local_actor.microphoneSpeakComponent.calls[2] == 0.3, 'disabling solo test restores local volume')
+tick()
+assert(#local_actor.microphoneSpeakComponent.calls == 2, 'local voice is untouched after test')
 print('voice control tests passed')
