@@ -40,7 +40,10 @@ local function widget(kind,name)
         self.children[#self.children+1]=child;child.parent=self;child.Slot=slot();return child.Slot
     end
     w.AddChildToHorizontalBox,w.AddChildToVerticalBox,w.AddChildToOverlay,w.AddChildToCanvas,w.AddChildToWrapBox=w.AddChild,w.AddChild,w.AddChild,w.AddChild,w.AddChild
-    function w:SetContent(child) self:AddChild(child) end
+    function w:SetContent(child)
+        for i=#self.children,1,-1 do self.children[i]:RemoveFromParent() end
+        self:AddChild(child)
+    end
     function w:GetCachedGeometry() return self.geometry end
     function w:GetDesiredSize()
         if self.width then return {X=self.width,Y=100} end
@@ -53,6 +56,8 @@ local function widget(kind,name)
     end
     function w:SetWidthOverride(width) self.width=width end
     function w:SetHeightOverride(height) self.height=height end
+    function w:ClearHeightOverride() self.height=nil end
+    function w:SetMinDesiredHeight(height) self.minHeight=height end
     function w:SetVisibility(value) self.visibility=value end
     function w:GetVisibility() return self.visibility end
     function w:SetIsEnabled(value) self.enabled=value end
@@ -93,7 +98,7 @@ local function nativeRow()
     row.Name=widget('TextBlock','Name')
     local buttons={}
     for i=1,4 do local button=widget('Button','Native'..i);button.desired.X=150;actions:AddChild(button);buttons[i]=button end
-    return row,header,actions,buttons
+    return row,header,actions,buttons,overlay
 end
 local menu=widget('PlayerMenu');menu.PlayerMenu=widget('CanvasPanel');menu.W_PlayerList_1=widget('Roster')
 menu.PlayerMenu.geometry.origin={X=20,Y=30}
@@ -104,19 +109,19 @@ local footer=menu.PlayerMenu.children[1]
 assert(footer.Slot.AutoSize,'footer height follows translated content')
 assert(footer:GetDesiredSize().X==800,'auto-sized footer remains constrained to the measured roster width')
 assert(footer.Slot.Offsets.Left==40 and footer.Slot.Offsets.Top==582,'footer uses canvas-local roster coordinates')
-local testRow,header,actions,buttons=nativeRow()
+local testRow,header,actions,buttons,nativeOverlay=nativeRow()
 mounted:mountRow(testRow,'remote')
 local entry=mounted.rows[testRow:GetAddress()]
-assert(entry.wrapped and #actions.children==0 and #entry.wrap.children==4,'crowded actions move together below identity')
+assert(#actions.children==0 and #entry.wrap.children==4,'native actions move together below identity')
 assert(entry.wrap.bExplicitWrapSize and entry.wrap.WrapSize==766,'wrap layout is constrained before its first Slate pass')
 for i,button in ipairs(buttons) do assert(entry.wrap.children[i]==button,'reparenting retains native objects and order') end
 header:SetIsEnabled(false);header:SetVisibility(3);mounted:layoutRow(entry)
 assert(entry.wrap:GetVisibility()==3 and not entry.wrap:GetIsEnabled(),'wrapper preserves inherited disabled and hit-test rules')
 actions:SetVisibility(1);mounted:layoutRow(entry)
-assert(not entry.wrapped and entry.wrap:GetVisibility()==1,'hidden native action container cannot reveal actions')
+assert(entry.wrap:GetVisibility()==1,'hidden native action container cannot reveal actions')
 actions:SetVisibility(0);header:SetVisibility(0);header:SetIsEnabled(true)
 mounted:layoutRow(entry)
-assert(entry.wrapped,'actions wrap again after the native group is shown')
+assert(entry.wrap:GetVisibility()~=1,'actions reappear in their own band after the native group is shown')
 testRow.geometry.size.X=0
 mounted:layoutRow(entry)
 assert(mounted.rows[testRow:GetAddress()]==entry,'an invalidated geometry does not rebuild or reset row width')
@@ -124,10 +129,34 @@ testRow.geometry.size.X=600
 mounted:layoutRow(entry)
 entry=mounted.rows[testRow:GetAddress()]
 assert(entry.wrap.WrapSize==576 and #entry.wrap.children==4,'a real resize updates wrapping and preserves native actions')
+local function available(widget,input)
+    while widget do
+        if widget.visibility==1 or widget.visibility==2 then return false end
+        if input and (widget.visibility==3 or not widget.enabled) then return false end
+        widget=widget.parent
+    end
+    return true
+end
+nativeOverlay:SetVisibility(3);mounted:layoutRow(entry)
+assert(not available(buttons[1],true),'native overlay can prevent pointer input to moved buttons')
+nativeOverlay:SetVisibility(1);mounted:layoutRow(entry)
+assert(not available(buttons[1],false),'native overlay can hide moved buttons')
+nativeOverlay:SetVisibility(0);nativeOverlay:SetIsEnabled(false);mounted:layoutRow(entry)
+assert(not available(buttons[1],true),'native overlay can disable moved buttons')
+nativeOverlay:SetIsEnabled(true)
 -- A new Lua UI instance must recover the actual native buttons before cleaning its old wrappers.
 local reloaded=ui.new(state,{},'next',locale)
 reloaded:mountRow(testRow,'remote')
 local nextEntry=reloaded.rows[testRow:GetAddress()]
 assert(#nextEntry.wrap.children==4,'hot reload keeps all native actions without duplicates')
 for i,button in ipairs(buttons) do assert(nextEntry.wrap.children[i]==button,'hot reload preserves action identity and order') end
+local shortRow,shortHeader,shortActions,shortButtons=nativeRow()
+for i=2,#shortButtons do shortButtons[i]:SetVisibility(1) end
+reloaded:mountRow(shortRow,'remote')
+local shortEntry=reloaded.rows[shortRow:GetAddress()]
+assert(shortButtons[1].parent==shortEntry.wrap,'even one profile button has a dedicated action band below identity')
+assert(shortRow.WidgetTree.RootWidget.height==nil,'row height follows its content instead of clipping text and buttons')
+local stack=shortEntry.wrap.parent
+assert(stack.kind=='/Script/UMG.VerticalBox' and stack.children[2]==shortEntry.wrap,'actions flow between identity and volume')
+assert(stack.children[1].children[1]==ui.rowOverlay(shortRow),'native background remains confined to the identity band')
 print('native UI layout contracts passed')

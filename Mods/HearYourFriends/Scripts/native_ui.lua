@@ -15,6 +15,21 @@ function M.isPlayerRow(row)
     return path:find('/Engine/Transient',1,true)~=nil and path:find('W_PlayerMenu.',1,true)~=nil
         and path:find('W_PlayerList_1.',1,true)~=nil
 end
+local function rowStack(content)
+    if owned(content) and content:GetFName():ToString():find('_Stack_',1,true) then return content end
+    for _,child in ipairs(children(content)) do
+        if owned(child) and child:GetFName():ToString():find('_Stack_',1,true) then return child end
+    end
+end
+function M.rowOverlay(row)
+    local size=row.WidgetTree.RootWidget
+    if not valid(size) then return nil end
+    local content=size:GetChildAt(0)
+    if not valid(content) then return nil end
+    local stack=rowStack(content)
+    if stack then return stack:GetChildAt(0):GetChildAt(0) end
+    return content
+end
 local function clean(panel)
     for _,child in ipairs(children(panel)) do if owned(child) then child:RemoveFromParent() end end
 end
@@ -122,7 +137,9 @@ function M.new(state,handlers,tag,locale)
     end
     function self:mountRow(row,key)
         local size=row.WidgetTree.RootWidget
-        local overlay=size:GetChildAt(0)
+        local content=size:GetChildAt(0)
+        local previous=rowStack(content)
+        local overlay=M.rowOverlay(row)
         local header
         for _,child in ipairs(children(overlay)) do
             if child:GetFName():ToString()=='HorizontalBox_1' then header=child end
@@ -133,6 +150,20 @@ function M.new(state,handlers,tag,locale)
             if child:GetFName():ToString()=='HorizontalBox_0' then actions=child end
         end
         assert(valid(actions),'Native player actions unavailable')
+        -- Unwrap our previous vertical layout without replacing native widgets.
+        if previous then
+            moveChildren(previous:GetChildAt(1),actions,'AddChildToHorizontalBox')
+            if content:GetAddress()==previous:GetAddress() then
+                -- Migration from the earlier stack mounted directly on SizeBox.
+                overlay:RemoveFromParent()
+                previous:RemoveFromParent()
+                size:SetContent(overlay)
+            else
+                moveChildren(overlay,content,'AddChildToOverlay')
+                previous:RemoveFromParent()
+                overlay=content
+            end
+        end
         -- Recover native buttons from our previous wrapper before Lua hot reload.
         for _,child in ipairs(children(overlay)) do
             if owned(child) and child:GetFName():ToString():find('_Actions_',1,true) then
@@ -140,33 +171,48 @@ function M.new(state,handlers,tag,locale)
             end
         end
         clean(overlay)
+        -- Restore padding left by the older fixed-height overlay layout.
+        for _,child in ipairs(children(overlay)) do
+            child.Slot:SetPadding({Left=0,Top=0,Right=0,Bottom=0})
+        end
         local width=slate:GetLocalSize(row:GetCachedGeometry()).X
         if width<=0 then width=790 end
-        local wrap=Umg.Construct('/Script/UMG.WrapBox',overlay,name('Actions'))
-        -- Automatic wrapping feeds the previous frame's desired width back into
-        -- row height. Constrain it before Slate creates the panel (5.4 has no
-        -- reflected SetWrapSize/SetExplicitWrapSize setters).
+        -- Keep the original overlay as the ancestor of every band so its native
+        -- visibility, opacity and input restrictions continue to apply.
+        local stack=Umg.Construct('/Script/UMG.VerticalBox',overlay,name('Stack'))
+        local identity=Umg.Construct('/Script/UMG.SizeBox',stack,name('Identity'))
+        local identityOverlay=Umg.Construct('/Script/UMG.Overlay',identity,name('IdentityContent'))
+        moveChildren(overlay,identityOverlay,'AddChildToOverlay')
+        header.Slot:SetVerticalAlignment(2)
+        header.Slot:SetPadding({Left=0,Top=4,Right=0,Bottom=4})
+        identity:SetMinDesiredHeight(36)
+        identity:SetContent(identityOverlay)
+        stack:AddChildToVerticalBox(identity)
+        local wrap=Umg.Construct('/Script/UMG.WrapBox',stack,name('Actions'))
+        -- Constrain wrapping before Slate construction; 5.4 has no reflected setters.
         wrap.bExplicitWrapSize=true
         wrap.WrapSize=math.max(1,width-24)
         wrap:SetInnerSlotPadding({X=0,Y=4})
         wrap:SetVisibility(1)
-        local wrapSlot=overlay:AddChildToOverlay(wrap)
-        wrapSlot:SetVerticalAlignment(1)
+        local wrapSlot=stack:AddChildToVerticalBox(wrap)
         wrapSlot:SetHorizontalAlignment(0)
-        wrapSlot:SetPadding({Left=12,Top=36,Right=12,Bottom=0})
-        local border=Umg.Construct('/Script/UMG.Border',overlay,name('Row'))
+        wrapSlot:SetPadding({Left=12,Top=6,Right=12,Bottom=6})
+        moveChildren(actions,wrap,'AddChildToWrapBox')
+        local border=Umg.Construct('/Script/UMG.Border',stack,name('Row'))
         border:SetBrushColor({R=.008,G=.025,B=.025,A=1})
-        border:SetPadding({Left=12,Top=3,Right=12,Bottom=3})
+        border:SetPadding({Left=12,Top=6,Right=12,Bottom=6})
         local player=state.players[key]
         local line,control=addSlider(border,key,locale:t(player.local_player and 'native_local' or 'native_voice'))
         border:SetContent(line)
-        local slot=overlay:AddChildToOverlay(border)
-        slot:SetVerticalAlignment(3);slot:SetHorizontalAlignment(0)
-        slot:SetPadding({Left=0,Top=0,Right=0,Bottom=4})
+        local slot=stack:AddChildToVerticalBox(border)
+        slot:SetPadding({Left=0,Top=0,Right=0,Bottom=8})
+        local stackSlot=overlay:AddChildToOverlay(stack)
+        stackSlot:SetHorizontalAlignment(0);stackSlot:SetVerticalAlignment(0)
+        size:ClearHeightOverride()
         if player.name then row.Name:SetToolTipText(FText(player.name)) end
         local old=self.rows[row:GetAddress()]
         if old then old.control.retired=true end
-        local entry={row=row,key=key,control=control,size=size,overlay=overlay,header=header,actions=actions,wrap=wrap,width=width,wrapped=false}
+        local entry={row=row,key=key,control=control,header=header,actions=actions,wrap=wrap,width=width}
         self.rows[row:GetAddress()]=entry
         self:layoutRow(entry)
     end
@@ -179,34 +225,17 @@ function M.new(state,handlers,tag,locale)
             self:mountRow(entry.row,entry.key)
             return
         end
-        local actionWidth=0
-        local source=entry.wrapped and entry.wrap or entry.actions
-        for _,child in ipairs(children(source)) do
+        local hasActions=false
+        for _,child in ipairs(children(entry.wrap)) do
             local visibility=child:GetVisibility()
-            if visibility~=1 and visibility~=2 then actionWidth=actionWidth+child:GetDesiredSize().X end
+            if visibility~=1 and visibility~=2 and not child:GetFName():ToString():match('^Spacer') then hasActions=true end
         end
         local parentVisibility=entry.actions:GetVisibility()
         local headerVisibility=entry.header:GetVisibility()
         local available=parentVisibility~=1 and parentVisibility~=2 and headerVisibility~=1 and headerVisibility~=2
-        local crowded=available and actionWidth>width-320
-        if crowded~=entry.wrapped then
-            if crowded then moveChildren(entry.actions,entry.wrap,'AddChildToWrapBox')
-            else moveChildren(entry.wrap,entry.actions,'AddChildToHorizontalBox') end
-            entry.wrapped=crowded
-        end
         local visibility=(parentVisibility==3 or headerVisibility==3) and 3 or 4
-        entry.wrap:SetVisibility(crowded and visibility or 1)
+        entry.wrap:SetVisibility(available and hasActions and visibility or 1)
         entry.wrap:SetIsEnabled(entry.actions:GetIsEnabled() and entry.header:GetIsEnabled())
-        local actionHeight=crowded and math.max(30,entry.wrap:GetDesiredSize().Y) or 0
-        local height=72+(crowded and actionHeight+4 or 0)
-        entry.size:SetHeightOverride(height)
-        entry.header.Slot:SetVerticalAlignment(1)
-        entry.header.Slot:SetPadding({Left=0,Top=4,Right=0,Bottom=0})
-        for _,child in ipairs(children(entry.overlay)) do
-            if not owned(child) and child:GetAddress()~=entry.header:GetAddress() then
-                child.Slot:SetPadding({Left=0,Top=0,Right=0,Bottom=height-36})
-            end
-        end
     end
     function self:refreshRows()
         for _,entry in pairs(self.rows) do if valid(entry.row) then self:layoutRow(entry) end end

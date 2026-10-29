@@ -11,7 +11,8 @@ function M.clear()
     for _,row in pairs(FindAllOf('W_HUD_PlayerListRow_C') or {}) do
         if valid(row) then
             pcall(function()
-                local overlay=row.WidgetTree.RootWidget:GetChildAt(0)
+                local overlay=NativeUI.rowOverlay(row)
+                if not valid(overlay) then return end
                 for i=0,overlay:GetChildrenCount()-1 do
                     if overlay:GetChildAt(i):GetFName():ToString():sub(1,#PREFIX)==PREFIX then
                         row:RemoveFromParent();break
