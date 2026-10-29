@@ -149,7 +149,7 @@ local function update()
             lastRoster=signature
         end
         local healthy,monitorReady=apply()
-        native:refresh()
+        native:refresh(monitorReady)
         if not healthy then return end
         if state.solo then
             status(monitorReady and locale:t('monitor_active',state.master) or locale:t('monitor_pending'))
@@ -157,7 +157,7 @@ local function update()
     end)
     if not ok then event('update_error',nil,nil,failure);status(locale:t('controls_error')) end
 end
-LoopAsync(500,function() ExecuteInGameThread(update);return false end)
+LoopInGameThreadWithDelay(500,Util.PinFn(update))
 LoopInGameThreadWithDelay(16,Util.PinFn(function()
     local ok,failure=pcall(function() native:poll() end)
     if not ok then event('ui_error',nil,nil,failure) end

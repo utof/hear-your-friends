@@ -39,6 +39,7 @@ def main():
     parser.add_argument('--game', type=Path, default=DEFAULT_GAME)
     parser.add_argument('--gain', type=float, default=1)
     parser.add_argument('--solo', action='store_true')
+    parser.add_argument('--ui-fixture', action='store_true', help='Add five local preview rows; no network players or voice.')
     parser.add_argument('--diagnostics', action='store_true')
     args = parser.parse_args()
     destination = mod_dir(args.game)
@@ -46,11 +47,20 @@ def main():
         parser.error('Installed HearYourFriends Scripts directory was not found.')
     sources = sorted((ROOT / 'Mods/HearYourFriends/Scripts').glob('*.lua'), key=lambda p: p.name == 'main.lua')
     changed = False
+    fixture = destination / 'hyf_ui_fixture.lua'
+    if args.ui_fixture or fixture.exists():
+        changed |= write_changed(fixture, (ROOT / 'tools/ui_fixture.lua').read_bytes())
     for source in sources:
         if source.name == 'main.lua':
             changed |= configure(args.game, args.gain, args.solo, args.diagnostics)
         if source.name != 'config.lua':
-            changed |= write_changed(destination / source.name, source.read_bytes())
+            data = source.read_bytes()
+            if source.name == 'main.lua' and fixture.exists():
+                tail = '\nExecuteInGameThreadWithDelay(250,Util.PinFn(function()\n local ok,err=pcall(function()\n local preview=require(\"hyf_ui_fixture\");preview.clear()\n'
+                if args.ui_fixture:
+                    tail += ' preview.start(state,locale,ModMenu.GetInstanceId())\n'
+                data += (tail + ' end)\n if not ok then print(\"[HearYourFriends.Preview] \"..tostring(err)..\"\\n\") end\nend))\n').encode()
+            changed |= write_changed(destination / source.name, data)
     print('Deployed; UE4SS auto-reload will apply it.' if changed else 'Installed files already match.')
     print('Gain %.3f; solo %s; diagnostics %s.' % (args.gain, args.solo, args.diagnostics))
 

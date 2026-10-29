@@ -6,6 +6,7 @@ The Lua suites mock engine objects; the audio test measures actual game output.
 ```sh
 python3 tools/audio_probe.py --check-audio  # No game required
 python3 tools/dev.py --solo --diagnostics  # Deploy to an installed mod
+python3 tools/dev.py --ui-fixture          # Five local UI preview rows; no network actors
 python3 tools/audio_probe.py              # One loaded world with mic loopback
 python3 tools/package.py                  # Manual-install ZIP
 ```
@@ -34,3 +35,6 @@ Useful references: [UE4SS Lua API](https://docs.ue4ss.com/dev/lua-api),
 Test mute, proximity/radio changes, reconnects and world changes with a second
 client before claiming multiplayer support. Keep maintainer notes under `.local/`;
 they are excluded from Git and release packages.
+
+Run `tools/dev.py` without `--ui-fixture` to remove the preview. Preview sliders
+use isolated test state; they do not verify multiplayer audio.

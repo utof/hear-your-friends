@@ -33,3 +33,6 @@ assert(changed==nil, 'external state synchronization does not emit another chang
 module.install()
 assert(widgets.get('slider')==module and widgets.get('number')==existing, 'adapter retains existing ModMenu widget types')
 print('slider tests passed')
+module.apply(control,0)
+module.reset(control)
+assert(control.last==1 and control.slider.value==1 and changed==1, 'Reset restores normal gain and applies it immediately')

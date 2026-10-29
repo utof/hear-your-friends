@@ -26,8 +26,8 @@ function voice:VoiceChatGetMuteAllPlayers() return false end
 function voice:VoiceChatLocalIsMutedSomeone(context,player) assert(context==local_actor);return player:GetAddress()==13 end
 StaticFindObject=function() return voice end
 FindAllOf=function() return {local_actor,remote,muted,no_owner} end
-LoopAsync=function(_,fn) tick=fn end
-LoopInGameThreadWithDelay=function() end
+LoopAsync=function() error('voice/UI engine calls must use game-thread timers') end
+LoopInGameThreadWithDelay=function(delay,fn) if delay==500 then tick=fn end end
 ExecuteInGameThread=function(fn) fn() end
 Key={F8=119}
 package.preload['config']=function() return {gain=1,soloTest=false} end

@@ -19,7 +19,8 @@ This PC build uses UE4SS and manual installation. It is not yet an official mod.
 package. Tested loader: `3.0.1-1176-g1ba38db4`; Steam build: `26232136`, under Proton.
 Multiplayer, radio transitions and Windows still need tests.
 
-Only the listener needs this mod. Player levels apply to the current world session.
+Designed to run on the listener’s PC; listener-only multiplayer installation still
+needs a second-client test. Player levels apply to the current world session.
 Close the game and remove `Mods/HearYourFriends` to uninstall. Keep shared libraries
 if another mod uses them.
 
