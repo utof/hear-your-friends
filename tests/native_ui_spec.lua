@@ -109,7 +109,7 @@ local footer=menu.PlayerMenu.children[1]
 assert(footer.Slot.AutoSize,'footer height follows translated content')
 assert(footer:GetDesiredSize().X==800,'auto-sized footer remains constrained to the measured roster width')
 assert(footer.Slot.Offsets.Left==40 and footer.Slot.Offsets.Top==582,'footer uses canvas-local roster coordinates')
-assert(#footer.children[1].children==3,'footer contains master, range hint and utilities without microphone test UI')
+assert(#footer.children[1].children==2,'footer contains only master and utilities')
 local testRow,header,actions,buttons,nativeOverlay=nativeRow()
 mounted:mountRow(testRow,'remote')
 local entry=mounted.rows[testRow:GetAddress()]
