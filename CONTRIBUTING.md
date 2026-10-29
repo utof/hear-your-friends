@@ -34,6 +34,11 @@ Useful references: [UE4SS Lua API](https://docs.ue4ss.com/dev/lua-api),
 [UMG sliders](https://dev.epicgames.com/documentation/unreal-engine/API/Runtime/UMG/USlider),
 [source effects](https://dev.epicgames.com/documentation/unreal-engine/API/Runtime/Engine/USoundEffectSourcePresetChain).
 
+The [official Blueprint filter](https://cdn.abfmods.com/blueprint-filter/1.5/BlueprintFilter.txt)
+(content version `2026102301`) blocks direct use of `UniversalVoiceChatPro` and
+`ModioUGC`. Verify a permitted client startup and voice-control path before
+porting to mod.io. Editor Python access does not establish Blueprint support.
+
 Test mute, proximity/radio changes, reconnects and world changes with a second
 client before claiming multiplayer support. Keep maintainer notes under `.local/`;
 they are excluded from Git and release packages.
