@@ -44,8 +44,11 @@ def main():
     destination = mod_dir(args.game)
     if not destination.is_dir():
         parser.error('Installed HearYourFriends Scripts directory was not found.')
-    changed = configure(args.game, args.gain, args.solo, args.diagnostics)
-    for source in (ROOT / 'Mods/HearYourFriends/Scripts').glob('*.lua'):
+    sources = sorted((ROOT / 'Mods/HearYourFriends/Scripts').glob('*.lua'), key=lambda p: p.name == 'main.lua')
+    changed = False
+    for source in sources:
+        if source.name == 'main.lua':
+            changed |= configure(args.game, args.gain, args.solo, args.diagnostics)
         if source.name != 'config.lua':
             changed |= write_changed(destination / source.name, source.read_bytes())
     print('Deployed; UE4SS auto-reload will apply it.' if changed else 'Installed files already match.')

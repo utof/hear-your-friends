@@ -14,3 +14,7 @@ artifacts/
 # Python developer tools
 __pycache__/
 *.pyc
+
+# Private maintainer notes
+.local/
+HearYourFriends-report.json

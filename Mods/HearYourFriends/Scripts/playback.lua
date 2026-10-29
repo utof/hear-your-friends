@@ -61,7 +61,7 @@ end
 function M.apply(mic, baseline, gain)
     assert(valid(mic) and valid(mic.VoiceCaptureAudioComponent), 'Voice playback component unavailable')
     assert(type(baseline) == 'number' and baseline == baseline and baseline >= 0 and baseline < math.huge, 'Invalid voice baseline')
-    assert(type(gain) == 'number' and gain == gain and gain >= 0 and gain <= 4, 'Invalid voice gain')
+    assert(type(gain) == 'number' and gain == gain and gain >= 0 and gain <= 16, 'Invalid voice gain')
     local audio = mic.VoiceCaptureAudioComponent
     assert(valid(audio.Sound), 'Voice procedural sound unavailable')
     if gain == 1 and not M.managed(mic) then return end

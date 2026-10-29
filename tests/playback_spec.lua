@@ -92,4 +92,6 @@ local foreignCopy = audio.SourceEffectChain
 reloaded.apply(mic, 3, 4)
 assert(audio.SourceEffectChain == foreignCopy, 'repeated updates retain a private copy of another mod override')
 assert(audio.SourceEffectChain.Chain[1].Preset == original, 'keeps override effects on repeated updates')
+reloaded.apply(mic, 3, 16)
+assert(math.abs(audio.SourceEffectChain.Chain[2].Preset.Settings.OutputGainDb - 20*math.log(16,10))<1e-6, 'supports explicit master times player gain')
 print('playback gain tests passed')

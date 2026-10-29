@@ -6,6 +6,5 @@ import sys
 
 root = Path(__file__).resolve().parents[1]
 subprocess.run([sys.executable, '-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_*.py'], cwd=root, check=True)
-subprocess.run([sys.executable, 'tools/run_lua.py', 'tests/voice_spec.lua'], cwd=root, check=True)
-subprocess.run([sys.executable, 'tools/run_lua.py', 'tests/playback_spec.lua'], cwd=root, check=True)
-subprocess.run([sys.executable, 'tools/run_lua.py', 'tests/menu_reload_spec.lua'], cwd=root, check=True)
+for suite in sorted((root / 'tests').glob('*_spec.lua')):
+    subprocess.run([sys.executable, 'tools/run_lua.py', str(suite)], cwd=root, check=True)

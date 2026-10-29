@@ -6,8 +6,8 @@ from zipfile import ZipFile, ZIP_DEFLATED
 root = Path(__file__).resolve().parents[1]
 output = root / 'artifacts/HearYourFriends-experimental.zip'
 output.parent.mkdir(exist_ok=True)
-files = [p for p in (root / 'Mods').rglob('*') if p.is_file()]
-files += [root / 'README.md', root / 'LICENSE', *sorted((root / 'docs').glob('*.md'))]
+files = [p for p in (root / 'Mods').rglob('*') if p.is_file() and p.name != 'HearYourFriends-report.json']
+files += [root / 'README.md', root / 'LICENSE']
 with ZipFile(output, 'w', ZIP_DEFLATED) as archive:
     for path in sorted(files):
         archive.write(path, path.relative_to(root))
