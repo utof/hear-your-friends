@@ -23,14 +23,14 @@ def write_changed(path, data):
     return True
 
 
-def configure(game, gain=1, solo=False, diagnostics=False):
+def configure(game, gain=1, diagnostics=False):
     if not 0 <= gain <= 4:
         raise ValueError('gain must be between 0 and 4')
     destination = mod_dir(game)
     if not destination.is_dir():
         raise RuntimeError('Install UE4SS and HearYourFriends before deploying.')
-    data = ('return { gain = %.9g, soloTest = %s, diagnostics = %s }\n' %
-            (gain, str(solo).lower(), str(diagnostics).lower())).encode()
+    data = ('return { gain = %.9g, diagnostics = %s }\n' %
+            (gain, str(diagnostics).lower())).encode()
     return write_changed(destination / 'config.lua', data)
 
 
@@ -38,7 +38,6 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--game', type=Path, default=DEFAULT_GAME)
     parser.add_argument('--gain', type=float, default=1)
-    parser.add_argument('--solo', action='store_true')
     parser.add_argument('--ui-fixture', action='store_true', help='Add five local preview rows; no network players or voice.')
     parser.add_argument('--diagnostics', action='store_true')
     args = parser.parse_args()
@@ -52,7 +51,7 @@ def main():
         changed |= write_changed(fixture, (ROOT / 'tools/ui_fixture.lua').read_bytes())
     for source in sources:
         if source.name == 'main.lua':
-            changed |= configure(args.game, args.gain, args.solo, args.diagnostics)
+            changed |= configure(args.game, args.gain, args.diagnostics)
         if source.name != 'config.lua':
             data = source.read_bytes()
             if source.name == 'main.lua' and fixture.exists():
@@ -62,7 +61,7 @@ def main():
                 data += (tail + ' end)\n if not ok then print(\"[HearYourFriends.Preview] \"..tostring(err)..\"\\n\") end\nend))\n').encode()
             changed |= write_changed(destination / source.name, data)
     print('Deployed; UE4SS auto-reload will apply it.' if changed else 'Installed files already match.')
-    print('Gain %.3f; solo %s; diagnostics %s.' % (args.gain, args.solo, args.diagnostics))
+    print('Gain %.3f; diagnostics %s.' % (args.gain, args.diagnostics))
 
 
 if __name__ == '__main__':

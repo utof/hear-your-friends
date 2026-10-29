@@ -15,7 +15,7 @@ print('native UI scope tests passed')
 local Umg=require('ModMenu.core.umg')
 local function slot()
     return setmetatable({}, {__index=function(_,key)
-        assert(key:match('^Set'),key)
+        if not key:match('^Set') then return nil end
         return function(self,value) self[key:sub(4)]=value end
     end})
 end
@@ -85,7 +85,7 @@ function slate:LocalToAbsolute(geometry,point) return {X=geometry.origin.X+point
 function slate:AbsoluteToLocal(geometry,point) return {X=point.X-geometry.origin.X,Y=point.Y-geometry.origin.Y} end
 StaticFindObject=function(path) if path:find('SlateBlueprintLibrary',1,true) then return slate end end
 FText=function(text) return text end
-local state={master=1,solo=false,players={remote={name='Remote',local_player=false}},levels={}}
+local state={master=1,players={remote={name='Remote',local_player=false}},levels={}}
 function state:effective(key) return self.master*(self.levels[key] or 1) end
 local locale={language='en',t=function(_,key) return key=='range_hint' and string.rep('Long translated hint ',100) or key end}
 local function nativeRow()
@@ -109,6 +109,7 @@ local footer=menu.PlayerMenu.children[1]
 assert(footer.Slot.AutoSize,'footer height follows translated content')
 assert(footer:GetDesiredSize().X==800,'auto-sized footer remains constrained to the measured roster width')
 assert(footer.Slot.Offsets.Left==40 and footer.Slot.Offsets.Top==582,'footer uses canvas-local roster coordinates')
+assert(#footer.children[1].children==3,'footer contains master, range hint and utilities without microphone test UI')
 local testRow,header,actions,buttons,nativeOverlay=nativeRow()
 mounted:mountRow(testRow,'remote')
 local entry=mounted.rows[testRow:GetAddress()]
@@ -159,4 +160,12 @@ assert(shortRow.WidgetTree.RootWidget.height==nil,'row height follows its conten
 local stack=shortEntry.wrap.parent
 assert(stack.kind=='/Script/UMG.VerticalBox' and stack.children[2]==shortEntry.wrap,'actions flow between identity and volume')
 assert(stack.children[1].children[1]==ui.rowOverlay(shortRow),'native background remains confined to the identity band')
+assert(shortHeader.Slot.HorizontalAlignment==0,'identity fills the row rather than shrinking names and background')
+assert(ui.rowOverlay(shortRow).children[1].Slot.HorizontalAlignment==0,'native background fills the identity band')
+state.players.local_user={name='You',local_player=true}
+local ownRow=nativeRow()
+local before=#reloaded.controls
+reloaded:mountRow(ownRow,'local_user')
+assert(#reloaded.controls==before,'your own row has no volume slider or Reset button')
+assert(#reloaded.rows[ownRow:GetAddress()].wrap.parent.children==2,'your own row contains only identity and native actions')
 print('native UI layout contracts passed')

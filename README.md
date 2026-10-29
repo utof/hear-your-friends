@@ -7,7 +7,8 @@ and voice chat volume with a master slider and individual player volume controls
 - Sliders range from 0–4×. Master and player levels multiply.
 - Native controls appear in **Escape → Manage Players → Players**. **F8** opens a separate panel.
 - **Report a bug** saves diagnostics and opens a GitHub issue draft. Review it before submitting.
-- Microphone playback lets you test alone. Enable the game's microphone loopback first.
+- Test master volume alone with the game's microphone loopback setting.
+- Raises the microphone-volume limit in the game's Audio settings to 1000%.
 
 ## Install
 

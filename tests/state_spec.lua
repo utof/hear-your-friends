@@ -1,5 +1,5 @@
 local source = assert(loadfile('Mods/HearYourFriends/Scripts/state.lua'), 'state module missing')
-local state = source().new({gain=1,soloTest=false})
+local state = source().new({gain=1})
 state:sync({{key='a',name='Alice'},{key='b',name='Bob'}})
 state:setMaster(2); state:setPlayer('a',.5)
 assert(state:effective('a')==1 and state:effective('b')==2, 'master multiplies each player level')
@@ -15,3 +15,7 @@ assert(state:effective('b')==4, 'disconnected player overrides cannot leak to a 
 state:setMaster(0/0)
 assert(state.master==4, 'rejects nonfinite inputs')
 print('player level tests passed')
+
+state:sync({{key='self',local_player=true}})
+state:setPlayer('self',4)
+assert(state.levels.self==nil and state:effective('self')==state.master,'local playback has no individual volume setting')

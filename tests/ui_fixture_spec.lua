@@ -9,17 +9,21 @@ local function widget(name)
  function w:AddChild(child)
   self.children[#self.children+1]=child;child.parent=self
   child.Slot={SetSize=function() end}
-  return setmetatable({}, {__index=function() return function() end end})
+  local slot=setmetatable({}, {__index=function(_,method) return function(self,value) self[method:sub(4)]=value end end})
+  child.canvasSlot=slot
+  return slot
  end
  w.AddChildToOverlay,w.AddChildToCanvas=w.AddChild,w.AddChild
  function w:SetVisibility(v) self.visibility=v end
  function w:SetIsEnabled(v) self.enabled=v end
  function w:SetText(v) self.text=v end
  function w:GetParent() return self.parent end
+ function w:GetCachedGeometry() return self.geometry end
  return w
 end
 local function row()
  local w=widget('NativeRow');local overlay=widget('Overlay')
+ function w:GetFullName() return '/Engine/Transient.W_PlayerMenu.WidgetTree.W_PlayerList_1.NativeRow' end
  w.TickFrequency=1;w.pendingNativeUpdate=true
  function w:StopAnimationsAndLatentActions() self.pendingNativeUpdate=false end
  w.WidgetTree={RootWidget={GetChildAt=function() return overlay end}}
@@ -38,7 +42,12 @@ local function row()
  return w
 end
 local example=row()
+local nativeList=widget('NativeList');nativeList:AddChild(example)
+example.geometry={origin={X=40,Y=290},size={X=790,Y=130}}
 local menu=widget('Menu');menu.PlayerMenu=widget('Canvas')
+menu.PlayerMenu.geometry={origin={X=0,Y=0},size={X=1920,Y=1080}}
+menu.W_PlayerList_1=widget('Roster')
+menu.W_PlayerList_1.geometry={origin={X=40,Y=245},size={X=800,Y=515}}
 function menu:GetFullName() return '/Engine/Transient.W_PlayerMenu' end
 FindAllOf=function(class)
  if class=='W_HUD_PlayerListRow_C' then return {example} end
@@ -47,6 +56,11 @@ FindAllOf=function(class)
 end
 local library={Create=function() local w=row();rows[#rows+1]=w;return w end}
 StaticFindObject=function(path)
+ if path=='/Script/UMG.Default__SlateBlueprintLibrary' then return {
+  GetLocalSize=function(_,geometry)return geometry.size end,
+  LocalToAbsolute=function(_,geometry,point)return {X=geometry.origin.X+point.X,Y=geometry.origin.Y+point.Y} end,
+  AbsoluteToLocal=function(_,geometry,point)return {X=point.X-geometry.origin.X,Y=point.Y-geometry.origin.Y} end,
+ } end
  assert(path=='/Script/UMG.Default__WidgetBlueprintLibrary','only the existing UI factory is used')
  return library
 end
@@ -72,6 +86,14 @@ for _,w in ipairs(rows) do
  end
 end
 for _=1,5 do callbacks[1]() end
+local preview=menu.PlayerMenu.children[1]
+assert(preview.canvasSlot.Offsets.Top==426,'preview begins below the actual local row instead of overlapping it')
+local old=example
+old.GetCachedGeometry=function()error('native row replaced')end
+example=row();nativeList:AddChild(example)
+example.geometry={origin={X=40,Y=290},size={X=790,Y=60}}
+for _=1,5 do callbacks[1]() end
+assert(preview.canvasSlot.Offsets.Top==356,'roster rebuilds reacquire the attached native row before docking')
 for _,w in ipairs(rows) do
  w:nativeUpdate() -- Native callbacks can run between any two preview polls.
  assert(w.Name.text and w.Name.text:find('PREVIEW',1,true),'preview identity survives native refresh')

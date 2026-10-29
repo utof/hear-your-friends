@@ -3,7 +3,7 @@ package.preload['UEHelpers.UEHelpers']=function() return {} end
 Key={F6=117}
 assert(loadfile('Mods/shared/ModMenu/ModMenu.lua'))()
 local report=assert(loadfile('Mods/HearYourFriends/Scripts/report.lua'),'report module missing')()
-local state=require('state').new({gain=2,soloTest=true})
+local state=require('state').new({gain=2})
 state:sync({{key='76561198000000000',name='Private name'}})
 state:setPlayer('76561198000000000',.5)
 local data=report.capture(state,{game_build='test',engine='5.4.4',loader='3.0.1',players={{key='76561198000000000',name='Private name',baseline=8,muted=false}}},{})

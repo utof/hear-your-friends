@@ -8,6 +8,7 @@ local Slider=require('slider')
 local NativeUI=require('native_ui')
 local Report=require('report')
 local MenuReload=require('menu_reload')
+local MicrophoneSettings=require('microphone_settings')
 local state=require('state').new(config)
 local locale=require('i18n').new(function()
     local library=StaticFindObject('/Script/Engine.Default__KismetInternationalizationLibrary')
@@ -39,7 +40,7 @@ local function event(kind,value,key,failure)
     if #events>32 then table.remove(events,1) end
 end
 local function apply()
-    local healthy,monitorReady=true,false
+    local healthy=true
     for _,player in ipairs(roster) do
         local ok,failure=pcall(function()
             local actor=player.actor
@@ -48,9 +49,7 @@ local function apply()
             if not valid(mic) then return end
             local audio=mic.VoiceCaptureAudioComponent
             if not valid(audio) or not valid(audio.Sound) then return end
-            if player.local_player then monitorReady=true end
-            if player.local_player and not state.solo and not Playback.managed(mic) then return end
-            local gain=player.local_player and not state.solo and 1 or state:effective(player.key)
+            local gain=state:effective(player.key)
             local db=Playback.apply(mic,actor.voiceVolume,gain)
             if config.diagnostics and player.local_player then
                 print(string.format('[HearYourFriends.Measure] gain=%.6f base=%.6f effect_db=%.6f\n',gain,actor.voiceVolume,db or 0))
@@ -62,7 +61,7 @@ local function apply()
             status(locale:t('voice_error'))
         end
     end
-    return healthy,monitorReady
+    return healthy
 end
 local handlers={}
 function handlers.master(value)
@@ -74,9 +73,6 @@ function handlers.player(key,value)
     local previous=state.levels[key] or 1;state:setPlayer(key,value)
     ModMenu.Set('Players',key,state.levels[key] or 1)
     if previous~=(state.levels[key] or 1) then event('player_level',state.levels[key],key);apply() end
-end
-function handlers.solo(value)
-    state.solo=value==true;ModMenu.Set('Voice','solo',state.solo);event('solo',state.solo);apply()
 end
 local function launch(url)
     StaticFindObject('/Script/Engine.Default__KismetSystemLibrary'):LaunchURL(url)
@@ -105,7 +101,6 @@ ModMenu.Init({title='Hear Your Friends',key=Key.F8,keyHint='F8',ignoreLook=true}
 local function registerVoice()
     ModMenu.Register({id='Voice',title=locale:t('voice_title'),items={
         {type='slider',id='gain',label=locale:t('master'),default=state.master,onChange=handlers.master},
-        {type='checkbox',id='solo',label=locale:t('solo_test'),default=state.solo,onChange=handlers.solo},
         {type='label',id='status',label=locale:t('load_world')},
         {type='label',label=locale:t('range_hint')},
         {type='button',id='report',label=locale:t('report'),onClick=handlers.report},
@@ -117,6 +112,7 @@ native=NativeUI.new(state,handlers,ModMenu.GetInstanceId(),locale)
 local function update()
     local ok,failure=pcall(function()
         if locale:refresh() then registerVoice();lastRoster=nil;lastStatus=nil end
+        MicrophoneSettings.refresh()
         if not prepared then MenuReload.prepare(ModMenu.GetInstanceId());prepared=true end
         local api=StaticFindObject('/Script/UniversalVoiceChatPro.Default__UniversalVoiceChat')
         if not valid(api) then status(locale:t('waiting_voice'));return end
@@ -148,12 +144,10 @@ local function update()
             end
             lastRoster=signature
         end
-        local healthy,monitorReady=apply()
-        native:refresh(monitorReady)
+        local healthy=apply()
+        native:refresh()
         if not healthy then return end
-        if state.solo then
-            status(monitorReady and locale:t('monitor_active',state.master) or locale:t('monitor_pending'))
-        else status(locale:t('ready')) end
+        status(locale:t('ready'))
     end)
     if not ok then event('update_error',nil,nil,failure);status(locale:t('controls_error')) end
 end
@@ -162,4 +156,4 @@ LoopInGameThreadWithDelay(16,Util.PinFn(function()
     local ok,failure=pcall(function() native:poll() end)
     if not ok then event('ui_error',nil,nil,failure) end
 end))
-print(string.format('[HearYourFriends] Loaded: gain=%.3f solo=%s; F8 controls.\n',state.master,tostring(state.solo)))
+print(string.format('[HearYourFriends] Loaded: gain=%.3f; F8 controls.\n',state.master))

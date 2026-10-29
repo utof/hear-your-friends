@@ -14,9 +14,9 @@ assert(locale:t('master')~='Master voice volume')
 assert(not locale:refresh(), 'unchanged game language does not rebuild the UI')
 for _,language in ipairs({'en','fr','de','pt-BR','ru','ja','zh-Hans','zh-Hant','es-419'}) do
  tag=language;locale:refresh()
- for _,key in ipairs({'master','report','support','native_voice','native_local','monitor_pending','reset','mic_apply','mic_stop','mic_hint'}) do
+ for _,key in ipairs({'master','report','support','native_voice','reset','range_hint','ready','effective'}) do
   assert(type(locale:t(key))=='string' and #locale:t(key)>0, 'required controls have localized labels')
  end
- assert(locale:t('monitor_active',2):find('2.00',1,true), 'translated status retains numeric gain')
+ assert(locale:t('effective',2,2,1):find('2.00',1,true), 'translated status retains numeric gain')
 end
 print('game language tests passed')

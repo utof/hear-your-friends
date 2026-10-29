@@ -30,7 +30,7 @@ LoopAsync=function() error('voice/UI engine calls must use game-thread timers') 
 LoopInGameThreadWithDelay=function(delay,fn) if delay==500 then tick=fn end end
 ExecuteInGameThread=function(fn) fn() end
 Key={F8=119}
-package.preload['config']=function() return {gain=1,soloTest=false} end
+package.preload['config']=function() return {gain=1} end
 package.preload['ModMenu.ModMenu']=function() return {
  Init=function() end,GetInstanceId=function() return 'test' end,
  Register=function(section) if section.id=='Voice' then menu=section else playerMenu=section end end,
@@ -42,12 +42,14 @@ package.preload['menu_reload']=function() return {prepare=function() end} end
 package.preload['native_ui']=function() return {new=function() return {refresh=function() end,poll=function() end} end} end
 package.preload['slider']=function() return {install=function() end} end
 package.preload['report']=function() return {} end
+package.preload['microphone_settings']=function() return {refresh=function() end} end
 package.preload['playback']=function() return {managed=function(mic) return mic.changed end,apply=function(mic,base,gain)
  if gain~=1 or mic.changed then mic:SetVoiceVolume(base*gain);mic.changed=gain~=1 end
  return gain>0 and 20*math.log(gain,10) or 0
 end} end
 dofile('Mods/HearYourFriends/Scripts/main.lua')
 assert(menu.items[1].type=='slider', 'uses a slider instead of a numeric field')
+for _,item in ipairs(menu.items) do assert(item.type~='checkbox','F8 has no duplicate microphone-test toggle') end
 tick()
 assert(#local_actor.microphoneSpeakComponent.calls==0, 'does not change local playback by default')
 assert(playerMenu and #playerMenu.items==2, 'lists connected remote players, including muted players')
@@ -72,15 +74,15 @@ assert(#remote.microphoneSpeakComponent.calls==calls, 'honors mute all')
 voice.VoiceChatGetMuteAllPlayers=function() return false end
 playerMenu.items[1].onChange(1);gain(1);tick()
 assert(remote.microphoneSpeakComponent.calls[#remote.microphoneSpeakComponent.calls]==.4, 'restores baseline')
-local solo=menu.items[2].onChange
-solo(true);gain(2)
-assert(local_actor.microphoneSpeakComponent.calls[#local_actor.microphoneSpeakComponent.calls]==.6, 'local monitor uses the same gain stage')
-solo(false)
-assert(local_actor.microphoneSpeakComponent.calls[#local_actor.microphoneSpeakComponent.calls]==.3, 'turning monitor off restores local playback')
-solo(true)
+gain(2)
+assert(local_actor.microphoneSpeakComponent.calls[#local_actor.microphoneSpeakComponent.calls]==.6, 'native loopback automatically uses master gain without a separate toggle')
+gain(1)
+assert(local_actor.microphoneSpeakComponent.calls[#local_actor.microphoneSpeakComponent.calls]==.3, 'master at one restores local playback baseline')
 local_actor.microphoneSpeakComponent.VoiceCaptureAudioComponent.Sound=nil
-tick()
-assert(status_text:find('loopback',1,true), 'explains missing microphone playback instead of claiming gain is active')
+local before=#local_actor.microphoneSpeakComponent.calls
+gain(3);tick()
+assert(#local_actor.microphoneSpeakComponent.calls==before,'disabled native loopback does not create microphone playback')
+assert(not status_text:find('loopback',1,true),'normal status does not prompt for a separate microphone test')
 local_actor.microphoneSpeakComponent.VoiceCaptureAudioComponent.Sound=object(102)
 local saved=voice.VoiceChatGetMyLocalPlayerVoiceChat
 voice.VoiceChatGetMyLocalPlayerVoiceChat=function() return nil end

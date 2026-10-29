@@ -5,7 +5,7 @@ The Lua suites mock engine objects; the audio test measures actual game output.
 
 ```sh
 python3 tools/audio_probe.py --check-audio  # No game required
-python3 tools/dev.py --solo --diagnostics  # Deploy to an installed mod
+python3 tools/dev.py --diagnostics  # Deploy to an installed mod
 python3 tools/dev.py --ui-fixture          # Five local UI preview rows; no network actors
 python3 tools/audio_probe.py              # One loaded world with mic loopback
 python3 tools/package.py                  # Manual-install ZIP
@@ -20,6 +20,8 @@ Later Lua edits reload in the running game; Ctrl+R is the manual fallback.
 `playback.lua` applies native source DSP and preserves existing effects.
 `slider.lua` extends ModMenu with USlider. `native_ui.lua` mounts controls in the
 Players tab. `i18n.lua` follows Unreal’s active language; translation fixes are welcome.
+`microphone_settings.lua` extends the native microphone control to 1000% and
+adds raw capture gain above the original 400% limit.
 `report.lua` produces diagnostics without player names, platform IDs,
 recordings or full logs. `main.lua` connects these modules.
 

@@ -112,15 +112,6 @@ function M.new(state,handlers,tag,locale)
         Umg.EnableAutoWrap(hint)
         local hintSlot=box:AddChildToVerticalBox(hint)
         hintSlot:SetPadding({Left=0,Top=6,Right=0,Bottom=10})
-        local mic=Umg.Construct('/Script/UMG.HorizontalBox',box,name('Mic'))
-        box:AddChildToVerticalBox(mic)
-        local micLabel=label(mic,locale:t('mic_label'),12)
-        local micSlot=mic:AddChildToHorizontalBox(micLabel)
-        micSlot:SetPadding(pad());micSlot:SetVerticalAlignment(2)
-        local micCaption=button(mic,'',function() handlers.solo(not state.solo) end,11)
-        local micHint=label(box,'',10)
-        Umg.EnableAutoWrap(micHint)
-        box:AddChildToVerticalBox(micHint)
         local actions=Umg.Construct('/Script/UMG.HorizontalBox',box,name('Utilities'))
         box:AddChildToVerticalBox(actions)
         button(actions,locale:t('native_report'),handlers.report,11,12)
@@ -130,7 +121,7 @@ function M.new(state,handlers,tag,locale)
         slot:SetAnchors({Minimum={X=.025,Y=.715},Maximum={X=.44,Y=.715}})
         slot:SetOffsets({Left=0,Top=0,Right=0,Bottom=180})
         slot:SetAutoSize(true);slot:SetZOrder(5)
-        local panel={menu=menu,slot=slot,width=width,micCaption=micCaption,micHint=micHint}
+        local panel={menu=menu,slot=slot,width=width}
         self.panels[menu:GetAddress()]=panel
         for i=firstButton,#self.buttons do self.buttons[i].menu=menu end
         placeFooter(panel)
@@ -183,11 +174,15 @@ function M.new(state,handlers,tag,locale)
         local identity=Umg.Construct('/Script/UMG.SizeBox',stack,name('Identity'))
         local identityOverlay=Umg.Construct('/Script/UMG.Overlay',identity,name('IdentityContent'))
         moveChildren(overlay,identityOverlay,'AddChildToOverlay')
+        for _,child in ipairs(children(identityOverlay)) do
+            child.Slot:SetHorizontalAlignment(0);child.Slot:SetVerticalAlignment(0)
+        end
         header.Slot:SetVerticalAlignment(2)
         header.Slot:SetPadding({Left=0,Top=4,Right=0,Bottom=4})
         identity:SetMinDesiredHeight(36)
         identity:SetContent(identityOverlay)
-        stack:AddChildToVerticalBox(identity)
+        identityOverlay.Slot:SetHorizontalAlignment(0);identityOverlay.Slot:SetVerticalAlignment(0)
+        stack:AddChildToVerticalBox(identity):SetHorizontalAlignment(0)
         local wrap=Umg.Construct('/Script/UMG.WrapBox',stack,name('Actions'))
         -- Constrain wrapping before Slate construction; 5.4 has no reflected setters.
         wrap.bExplicitWrapSize=true
@@ -198,20 +193,25 @@ function M.new(state,handlers,tag,locale)
         wrapSlot:SetHorizontalAlignment(0)
         wrapSlot:SetPadding({Left=12,Top=6,Right=12,Bottom=6})
         moveChildren(actions,wrap,'AddChildToWrapBox')
-        local border=Umg.Construct('/Script/UMG.Border',stack,name('Row'))
-        border:SetBrushColor({R=.008,G=.025,B=.025,A=1})
-        border:SetPadding({Left=12,Top=6,Right=12,Bottom=6})
         local player=state.players[key]
-        local line,control=addSlider(border,key,locale:t(player.local_player and 'native_local' or 'native_voice'))
-        border:SetContent(line)
-        local slot=stack:AddChildToVerticalBox(border)
-        slot:SetPadding({Left=0,Top=0,Right=0,Bottom=8})
+        local control
+        if not player.local_player then
+            local border=Umg.Construct('/Script/UMG.Border',stack,name('Row'))
+            border:SetBrushColor({R=.008,G=.025,B=.025,A=1})
+            border:SetPadding({Left=12,Top=6,Right=12,Bottom=6})
+            local line
+            line,control=addSlider(border,key,locale:t('native_voice'))
+            border:SetContent(line)
+            local slot=stack:AddChildToVerticalBox(border)
+            slot:SetHorizontalAlignment(0)
+            slot:SetPadding({Left=0,Top=0,Right=0,Bottom=8})
+        end
         local stackSlot=overlay:AddChildToOverlay(stack)
         stackSlot:SetHorizontalAlignment(0);stackSlot:SetVerticalAlignment(0)
         size:ClearHeightOverride()
         if player.name then row.Name:SetToolTipText(FText(player.name)) end
         local old=self.rows[row:GetAddress()]
-        if old then old.control.retired=true end
+        if old and old.control then old.control.retired=true end
         local entry={row=row,key=key,control=control,header=header,actions=actions,wrap=wrap,width=width}
         self.rows[row:GetAddress()]=entry
         self:layoutRow(entry)
@@ -246,15 +246,14 @@ function M.new(state,handlers,tag,locale)
                 local value=control.key and (state.levels[control.key] or 1) or state.master
                 if math.abs(value-control.last)>.0001 then Slider.apply(control,value) end
                 local player=control.key and state.players[control.key]
-                local enabled=not control.key or (player~=nil and (not player.local_player or state.solo))
+                local enabled=not control.key or player~=nil
                 control.slider:SetIsEnabled(enabled);control.reset:SetIsEnabled(enabled)
                 local hint=control.key and locale:t('effective',state:effective(control.key),state.master,value) or locale:t('range_hint')
-                if player and player.local_player and not state.solo then hint=locale:t('mic_hint') end
                 control.slider:SetToolTipText(FText(hint))
             end
         end
     end
-    function self:refresh(monitorReady)
+    function self:refresh()
         if language~=locale.language then
             language=locale.language
             for _,control in ipairs(self.controls) do control.retired=true end
@@ -262,7 +261,10 @@ function M.new(state,handlers,tag,locale)
         end
         for address,panel in pairs(self.panels) do if not valid(panel.menu) then self.panels[address]=nil end end
         for address,entry in pairs(self.rows) do
-            if not M.isPlayerRow(entry.row) then entry.control.retired=true;self.rows[address]=nil end
+            if not M.isPlayerRow(entry.row) then
+                if entry.control then entry.control.retired=true end
+                self.rows[address]=nil
+            end
         end
         for _,menu in pairs(FindAllOf('W_PlayerMenu_C') or {}) do
             if valid(menu) and valid(menu.PlayerMenu) and menu:GetFullName():find('/Engine/Transient',1,true) and not self.panels[menu:GetAddress()] then self:mountPanel(menu) end
@@ -277,8 +279,6 @@ function M.new(state,handlers,tag,locale)
         self:refreshRows()
         for _,panel in pairs(self.panels) do
             placeFooter(panel)
-            Umg.SetLabelText(panel.micCaption,locale:t(state.solo and 'mic_stop' or 'mic_apply'))
-            Umg.SetLabelText(panel.micHint,locale:t(state.solo and not monitorReady and 'monitor_pending' or 'mic_hint'))
         end
         for i=#self.buttons,1,-1 do
             local button=self.buttons[i]

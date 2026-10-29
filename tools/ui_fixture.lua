@@ -34,7 +34,34 @@ end
 function M.start(hostState,locale,tag)
     print('[HearYourFriends.Preview] Preview setup waiting for Players UI.\n')
     local state=State.new({gain=hostState.master})
-    local ui,menu,scroll
+    local ui,menu,scroll,example,scrollSlot
+    local slate=StaticFindObject('/Script/UMG.Default__SlateBlueprintLibrary')
+    local function currentRow(candidate)
+        local full=candidate:GetFullName()
+        local path=full:match('^%S+%s+(.+)$') or full
+        for _,row in pairs(FindAllOf('W_HUD_PlayerListRow_C') or {}) do
+            if NativeUI.isPlayerRow(row) and valid(row:GetParent())
+                and row:GetFullName():find(path..'.',1,true) then return row end
+        end
+    end
+    local function dock()
+        example=currentRow(menu)
+        if not example then return end
+        local rowGeometry=example:GetCachedGeometry()
+        local rowSize=slate:GetLocalSize(rowGeometry)
+        local listGeometry=menu.W_PlayerList_1:GetCachedGeometry()
+        local listSize=slate:GetLocalSize(listGeometry)
+        if rowSize.X<=0 or rowSize.Y<=0 or listSize.Y<=0 then return end
+        local canvasGeometry=menu.PlayerMenu:GetCachedGeometry()
+        local function position(geometry,x,y)
+            return slate:AbsoluteToLocal(canvasGeometry,slate:LocalToAbsolute(geometry,{X=x,Y=y}))
+        end
+        local left=position(rowGeometry,0,rowSize.Y)
+        local right=position(rowGeometry,rowSize.X,rowSize.Y)
+        local bottom=position(listGeometry,0,listSize.Y-10)
+        scrollSlot:SetAnchors({Minimum={X=0,Y=0},Maximum={X=0,Y=0}})
+        scrollSlot:SetOffsets({Left=left.X,Top=left.Y+6,Right=right.X-left.X,Bottom=math.max(0,bottom.Y-left.Y-6)})
+    end
     local previews={
         {key='quiet',name='PREVIEW · Quiet friend',ping='42',buttons={'Profile','Mute','Report','Block'}},
         {key='host',name='PREVIEW · A_very_long_player_name_0123456789',ping='120',buttons={'Profile','Mute','Report','Block','Kick','Ban'}},
@@ -49,20 +76,20 @@ function M.start(hostState,locale,tag)
         print(string.format('[HearYourFriends.Preview] %s level=%.2f effective=%.2f\n',key,value,state:effective(key)))
     end}
     local function mount()
-        local example
-        for _,row in pairs(FindAllOf('W_HUD_PlayerListRow_C') or {}) do
-            if NativeUI.isPlayerRow(row) then example=row;break end
-        end
-        if not example then return false end
+        example=nil
+        menu=nil
         for _,candidate in pairs(FindAllOf('W_PlayerMenu_C') or {}) do
-            if valid(candidate) and candidate:GetFullName():find('/Engine/Transient',1,true) then menu=candidate;break end
+            if valid(candidate) and candidate:GetFullName():find('/Engine/Transient',1,true) then
+                local row=currentRow(candidate)
+                if row then menu=candidate;example=row;break end
+            end
         end
         if not menu then return false end
         scroll=Umg.Construct('/Script/UMG.ScrollBox',menu.PlayerMenu,PREFIX..tag)
-        local slot=menu.PlayerMenu:AddChildToCanvas(scroll)
-        slot:SetAnchors({Minimum={X=.026,Y=.35},Maximum={X=.434,Y=.694}})
-        slot:SetOffsets({Left=0,Top=0,Right=0,Bottom=0})
-        slot:SetZOrder(10)
+        scrollSlot=menu.PlayerMenu:AddChildToCanvas(scroll)
+        scrollSlot:SetAnchors({Minimum={X=.026,Y=.35},Maximum={X=.434,Y=.694}})
+        scrollSlot:SetOffsets({Left=0,Top=0,Right=0,Bottom=0})
+        scrollSlot:SetZOrder(10)
         local library=StaticFindObject('/Script/UMG.Default__WidgetBlueprintLibrary')
         ui=NativeUI.new(state,handlers,tag..'_Preview',locale)
         for _,player in ipairs(previews) do
@@ -136,7 +163,7 @@ function M.start(hostState,locale,tag)
                     end)
                 end
             end
-            if ticks%5==0 then ui:refreshRows() end
+            if ticks%5==0 then ui:refreshRows();dock() end
             ui:poll()
         end)
         if not ok and tostring(err)~=lastError then

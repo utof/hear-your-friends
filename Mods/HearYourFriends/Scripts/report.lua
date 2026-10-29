@@ -15,7 +15,7 @@ end
 function M.capture(state,context,events)
     local data={schema=1,mod_version=M.VERSION,created_utc=os.date('!%Y-%m-%dT%H:%M:%SZ'),
         game_build=context.game_build,engine=context.engine,loader=context.loader,role=context.role,
-        map=context.map,language=context.language,master=state.master,solo=state.solo,mute_all=context.mute_all,
+        map=context.map,language=context.language,master=state.master,mute_all=context.mute_all,
         update_ms=500,players={},events={}}
     for index,player in ipairs(context.players or {}) do
         data.players[index]={id='P'..index,level=state.levels[player.key] or 1,effective=state:effective(player.key),
@@ -33,7 +33,7 @@ function M.issueUrl(data)
     local details=Json.Encode(data)
     if #details>4500 then
         details=Json.Encode({mod_version=data.mod_version,game_build=data.game_build,engine=data.engine,
-            loader=data.loader,master=data.master,solo=data.solo,player_count=#data.players})
+            loader=data.loader,master=data.master,player_count=#data.players})
     end
     local body='## What happened?\n\n## Steps to reproduce\n1. \n\n## Expected result\n\n## Diagnostics\n```json\n'..details..'\n```\n\nAttach HearYourFriends-report.json from the mod Scripts folder for the full report.\n'
     return 'https://github.com/utof/hear-your-friends/issues/new?title=Voice%20volume%20bug&body='..M.encodeUrl(body)

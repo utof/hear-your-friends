@@ -127,7 +127,7 @@ def measure(source_sink, capture_sink, amplitude):
 
 def await_reload(log, offset, gain):
     deadline = time.monotonic() + 15
-    marker = 'Loaded: gain=%.3f solo=true' % gain if gain is not None else '[HearYourFriends] Loaded:'
+    marker = 'Loaded: gain=%.3f;' % gain if gain is not None else '[HearYourFriends] Loaded:'
     while time.monotonic() < deadline:
         text = log.read_text(errors='replace') if log.exists() else ''
         recent = text[offset:] if len(text) >= offset else text
@@ -169,7 +169,7 @@ def game_probe(args):
             with synthetic_capture(inputs, test_input):
                 for gain in (0, 0.1, 0.5, 1, 2, 4):
                     offset = len(log.read_text(errors='replace')) if log.exists() else 0
-                    if configure(args.game, gain, solo=True, diagnostics=True):
+                    if configure(args.game, gain, diagnostics=True):
                         await_reload(log, offset, gain)
                     time.sleep(1)
                     rms = measure(test_input, test_output, args.amplitude)
