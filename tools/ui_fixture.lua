@@ -66,9 +66,13 @@ function M.start(hostState,locale,tag)
         ui=NativeUI.new(state,handlers,tag..'_Preview',locale)
         for _,player in ipairs(previews) do
             local row=library:Create(Helpers.GetWorld(),example:GetClass(),Helpers.GetPlayerController())
+            -- Never run the real row's player-state polling on an unbound preview.
+            -- Set before Slate construction; EWidgetTickFrequency::Never = 0.
+            row.TickFrequency=0
             local overlay=row.WidgetTree.RootWidget:GetChildAt(0)
             overlay:AddChildToOverlay(Umg.Construct('/Script/UMG.Spacer',overlay,PREFIX..player.key))
             local rowSlot=scroll:AddChild(row)
+            row:StopAnimationsAndLatentActions()
             rowSlot:SetHorizontalAlignment(0)
             row:SetVisibility(0)
             player.widget=row

@@ -108,6 +108,7 @@ local testRow,header,actions,buttons=nativeRow()
 mounted:mountRow(testRow,'remote')
 local entry=mounted.rows[testRow:GetAddress()]
 assert(entry.wrapped and #actions.children==0 and #entry.wrap.children==4,'crowded actions move together below identity')
+assert(entry.wrap.bExplicitWrapSize and entry.wrap.WrapSize==766,'wrap layout is constrained before its first Slate pass')
 for i,button in ipairs(buttons) do assert(entry.wrap.children[i]==button,'reparenting retains native objects and order') end
 header:SetIsEnabled(false);header:SetVisibility(3);mounted:layoutRow(entry)
 assert(entry.wrap:GetVisibility()==3 and not entry.wrap:GetIsEnabled(),'wrapper preserves inherited disabled and hit-test rules')
@@ -116,6 +117,13 @@ assert(not entry.wrapped and entry.wrap:GetVisibility()==1,'hidden native action
 actions:SetVisibility(0);header:SetVisibility(0);header:SetIsEnabled(true)
 mounted:layoutRow(entry)
 assert(entry.wrapped,'actions wrap again after the native group is shown')
+testRow.geometry.size.X=0
+mounted:layoutRow(entry)
+assert(mounted.rows[testRow:GetAddress()]==entry,'an invalidated geometry does not rebuild or reset row width')
+testRow.geometry.size.X=600
+mounted:layoutRow(entry)
+entry=mounted.rows[testRow:GetAddress()]
+assert(entry.wrap.WrapSize==576 and #entry.wrap.children==4,'a real resize updates wrapping and preserves native actions')
 -- A new Lua UI instance must recover the actual native buttons before cleaning its old wrappers.
 local reloaded=ui.new(state,{},'next',locale)
 reloaded:mountRow(testRow,'remote')

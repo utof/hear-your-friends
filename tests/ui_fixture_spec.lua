@@ -20,6 +20,8 @@ local function widget(name)
 end
 local function row()
  local w=widget('NativeRow');local overlay=widget('Overlay')
+ w.TickFrequency=1;w.pendingNativeUpdate=true
+ function w:StopAnimationsAndLatentActions() self.pendingNativeUpdate=false end
  w.WidgetTree={RootWidget={GetChildAt=function() return overlay end}}
  overlay:AddChild(widget('HorizontalBox_1'))
  local scale=widget('NameScale');overlay:AddChild(scale)
@@ -27,6 +29,11 @@ local function row()
  w.StatusText,w.UniquePlayerID=widget('StatusText'),widget('UniquePlayerID')
  for _,suffix in ipairs({'HardcoreRevive','Profile','Mute','Report','Block','Kick','Ban'}) do
   w['Button_'..suffix]=widget(suffix)
+ end
+ function w:nativeUpdate()
+  if self.TickFrequency~=0 or self.pendingNativeUpdate then
+   self.Name.text='';self.Button_Profile.visibility=1
+  end
  end
  return w
 end
@@ -66,7 +73,9 @@ for _,w in ipairs(rows) do
 end
 for _=1,5 do callbacks[1]() end
 for _,w in ipairs(rows) do
+ w:nativeUpdate() -- Native callbacks can run between any two preview polls.
  assert(w.Name.text and w.Name.text:find('PREVIEW',1,true),'preview identity survives native refresh')
+ assert(w.Button_Profile.visibility==0,'preview profile stays visible between polls')
  for _,suffix in ipairs({'Profile','Mute','Report','Block','Kick','Ban'}) do
   assert(not w['Button_'..suffix].enabled,'native refresh cannot leave preview actions enabled')
  end

@@ -140,11 +140,19 @@ function M.new(state,handlers,tag,locale)
             end
         end
         clean(overlay)
+        local width=slate:GetLocalSize(row:GetCachedGeometry()).X
+        if width<=0 then width=790 end
         local wrap=Umg.Construct('/Script/UMG.WrapBox',overlay,name('Actions'))
+        -- Automatic wrapping feeds the previous frame's desired width back into
+        -- row height. Constrain it before Slate creates the panel (5.4 has no
+        -- reflected SetWrapSize/SetExplicitWrapSize setters).
+        wrap.bExplicitWrapSize=true
+        wrap.WrapSize=math.max(1,width-24)
         wrap:SetInnerSlotPadding({X=0,Y=4})
         wrap:SetVisibility(1)
         local wrapSlot=overlay:AddChildToOverlay(wrap)
         wrapSlot:SetVerticalAlignment(1)
+        wrapSlot:SetHorizontalAlignment(0)
         wrapSlot:SetPadding({Left=12,Top=36,Right=12,Bottom=0})
         local border=Umg.Construct('/Script/UMG.Border',overlay,name('Row'))
         border:SetBrushColor({R=.008,G=.025,B=.025,A=1})
@@ -158,13 +166,19 @@ function M.new(state,handlers,tag,locale)
         if player.name then row.Name:SetToolTipText(FText(player.name)) end
         local old=self.rows[row:GetAddress()]
         if old then old.control.retired=true end
-        local entry={row=row,key=key,control=control,size=size,overlay=overlay,header=header,actions=actions,wrap=wrap,wrapped=false}
+        local entry={row=row,key=key,control=control,size=size,overlay=overlay,header=header,actions=actions,wrap=wrap,width=width,wrapped=false}
         self.rows[row:GetAddress()]=entry
         self:layoutRow(entry)
     end
     function self:layoutRow(entry)
         local width=slate:GetLocalSize(entry.row:GetCachedGeometry()).X
-        if width<=0 then width=790 end
+        if width<=0 then width=entry.width end
+        if math.abs(width-entry.width)>1 then
+            -- Rebuild only on a measured resize so the new Slate panel receives
+            -- its explicit width; retain the last width while geometry is absent.
+            self:mountRow(entry.row,entry.key)
+            return
+        end
         local actionWidth=0
         local source=entry.wrapped and entry.wrap or entry.actions
         for _,child in ipairs(children(source)) do
